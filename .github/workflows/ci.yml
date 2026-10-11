@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DIVE_VERSION: v0.13.1
+  IMAGE: devops-notes-app:ci
+
+jobs:
+  dive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Tool versions
+        run: |
+          docker version --format 'Docker {{.Server.Version}}'
+          docker run --rm "wagoodman/dive:${DIVE_VERSION}" --version
+
+      - name: Build image
+        run: docker build -t "$IMAGE" .
+
+      - name: Dive check
+        run: |
+          docker image ls "$IMAGE"
+          docker save "$IMAGE" -o image.tar
+          docker run --rm -e CI=true \
+            -v "$PWD/image.tar:/image.tar:ro" \
+            -v "$PWD/.dive-ci:/.dive-ci:ro" \
+            "wagoodman/dive:${DIVE_VERSION}" \
+            --source docker-archive /image.tar --ci-config /.dive-ci
